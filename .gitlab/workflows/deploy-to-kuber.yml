@@ -1,0 +1,38 @@
+.auth-hetzner:
+  variables:
+    # Variables define for group
+    HTZ_CERT_AUTHORITY_DATA: ""
+    HTZ_CLIENT_KEY_DATA: ""
+    HTZ_CLUSTER_SERVER: ""
+    HTZ_NAMESPACE: ""
+    HTZ_TOKEN: ""
+    HTZ_USER: ""
+  image: 'ghcr.io/rieset/kubernates-tools:v.2.0.0'
+  interruptible: true
+  before_script:
+    - echo "$HTZ_CERT_AUTHORITY_DATA" | base64 --decode > cluster.pem
+    - echo "$HTZ_CLIENT_KEY_DATA" | base64 --decode > key.pem
+    - kubectl config set-cluster htz --server=$HTZ_CLUSTER_SERVER --certificate-authority=cluster.pem
+    - kubectl config set-credentials marketing-admin --client-key=key.pem --token=$HTZ_TOKEN
+    - kubectl config set-context htz --cluster=htz --user=$HTZ_USER
+    - kubectl config use-context htz
+
+.auth-aws:
+  variables:
+    # Variables define for group
+    EKS_ACCESS_KEY_ID: ""
+    EKS_SECRET_ACCESS_KEY: ""
+    EKS_REGION: ""
+    EKS_CLUSTER_NAME: ""
+    EKS_CLUSTER_ALIAS: ""
+  image: 'ghcr.io/rieset/kubernates-tools:v.2.0.0'
+  interruptible: true
+  before_script:
+    - export AWS_ACCESS_KEY_ID=$EKS_ACCESS_KEY_ID
+    - export AWS_SECRET_ACCESS_KEY=$EKS_SECRET_ACCESS_KEY
+    - export AWS_DEFAULT_REGION=$EKS_REGION
+    - export CLUSTER_NAME=$EKS_CLUSTER_NAME
+    - aws --profile default configure set aws_access_key_id "$EKS_ACCESS_KEY_ID"
+    - aws --profile default configure set aws_secret_access_key "$EKS_SECRET_ACCESS_KEY"
+    - aws eks update-kubeconfig --region $EKS_REGION --name $EKS_CLUSTER_NAME --alias $EKS_CLUSTER_ALIAS
+    - kubectl config use-context $EKS_CLUSTER_ALIAS

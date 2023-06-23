@@ -1,0 +1,64 @@
+.stage:
+  variables:
+    # Namespace in cluster
+    NAMESPACE: ""
+
+    # Tag revision
+    TAG: $CI_COMMIT_SHORT_SHA
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_REF_SLUG == $CI_DEFAULT_BRANCH
+      when: always
+    - when: never
+  interruptible: true
+  script:
+    - export DEBIAN_FRONTEND=noninteractive
+    - npx envsub ./.helm/values.yaml
+    - echo $CI_REGISTRY_CREDS >> key.json
+    - kubectl create secret generic regcredwp --from-file=.dockerconfigjson=key.json --type=kubernetes.io/dockerconfigjson -n $NAMESPACE || true
+    - grep -E '^      [A-Z0-9_ \t\s]+:\s*$' ./.helm/values.yaml || true
+    - >
+      helm upgrade
+      --install
+      --wait
+      --namespace="$NAMESPACE"
+      --set mode="stage"
+      "$CI_PROJECT_NAME"
+      .helm/
+    - rm -R ./.helm
+
+.release:
+  variables:
+    # Namespace in cluster
+    NAMESPACE: ""
+
+    # Tag revision
+    TAG: "release"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - if: $CI_COMMIT_TAG
+      when: always
+    - when: never
+  interruptible: true
+  script:
+    - export DEBIAN_FRONTEND=noninteractive
+    - npx envsub ./.helm/values.yaml
+    - echo $CI_REGISTRY_CREDS >> key.json
+    - kubectl create secret generic regcredwp --from-file=.dockerconfigjson=key.json --type=kubernetes.io/dockerconfigjson -n $NAMESPACE || true
+    - grep -E '^      [A-Z0-9_ \t\s]+:\s*$' ./.helm/values.yaml || true
+    - >
+      helm upgrade
+      --install
+      --wait
+      --namespace="$NAMESPACE"
+      "$CI_PROJECT_NAME"
+      --set frontend.service.type=ClusterIP
+      --set ingress.eksEnabled=true
+      --set frontend.replicaCount=1
+      --set mode="release"
+      .helm/
+    - rm -R ./.helm

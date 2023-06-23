@@ -1,0 +1,14 @@
+.heating:
+  variables:
+    PUBLIC_URL: ""
+  image:
+    name: node:18-alpine
+  interruptible: true
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: always
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - when: never
+  script:
+    - npx site-heater $PUBLIC_URL

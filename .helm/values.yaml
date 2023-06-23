@@ -1,0 +1,149 @@
+# Commit hash
+mode: release
+commit: ${CI_PROJECT_NAME}-${CI_COMMIT_SHORT_SHA}
+namespace: ${NAMESPACE}
+
+ingress:
+  email: ${SUPPORT_EMAIL}
+  https: true
+  enabled: true
+  clusterIssuer: letsencrypt-prod
+  eksEnabled: false
+  domains:
+    -
+      mode: stage
+      alias: frontend
+      port: ${FRONTEND_PORT}
+      hosts:
+        - ${STAGE_DOMAIN}
+    -
+      mode: release
+      alias: frontend
+      port: ${FRONTEND_PORT}
+      hosts:
+        - ${RELEASE_DOMAIN}
+        - www.${RELEASE_DOMAIN}
+    -
+      mode: release
+      alias: backend
+      port: ${BACKEND_PORT}
+      hosts:
+        - core.${RELEASE_DOMAIN}
+
+# Connect to docker registry
+registry:
+  pullPolicy: Always # IfNotPresent from local version
+
+# Common environments
+common:
+  envs:
+    all:
+      NODE_ENV: "production"
+      COMMIT: ${CI_PROJECT_NAME}-${CI_COMMIT_SHORT_SHA}
+
+      REDIS_HOST: ${COMMON_REDIS_HOST}
+      REDIS_PORT: ${COMMON_REDIS_PORT}
+
+    stage:
+      CACHE: false
+      STAGE_MODE: true
+
+    release:
+      CACHE: true
+      RELEASE_MODE: true
+
+  secrets:
+    all:
+      REDIS_PASSWORD: ${COMMON_REDIS_PASSWORD}
+
+    release:
+      CACHE_REVALIDATE_WEBHOOK: ${CACHE_REVALIDATE_WEBHOOK}
+
+frontend:
+  enabled: true
+  alias: frontend
+  replicaCount: 1
+  image:
+    repository: ${CI_REGISTRY}/${NAMESPACE}/${CI_PROJECT_NAME}/frontend:${TAG}
+  service:
+    name: http
+    type: NodePort
+    externalPort: ${FRONTEND_PORT}
+    internalPort: ${FRONTEND_PORT}
+  resources:
+    requests:
+      memory: 128Mi
+      cpu: 200m
+    limits:
+      memory: 256Mi
+      cpu: 300m
+  debug: false
+  connections:
+    backend:
+      port: ${BACKEND_PORT}
+  envs:
+    all:
+      PUBLIC_URL: ${PUBLIC_URL}
+
+backend:
+  enabled: true
+  alias: backend
+  replicaCount: 2
+  image:
+    repository: ${CI_REGISTRY}/${NAMESPACE}/${CI_PROJECT_NAME}/backend:${TAG}
+  service:
+    name: http
+    type: NodePort
+    externalPort: ${BACKEND_PORT}
+    internalPort: ${BACKEND_PORT}
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 300m
+    limits:
+      memory: 512Mi
+      cpu: 400m
+  debug: false
+  envs:
+    all:
+      RECAPTCHA: ${RECAPTCHA}
+
+      PUBLIC_URL: ${PUBLIC_URL}
+
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      AWS_S3_REGION: ${AWS_S3_REGION}
+
+      DATABASE_HOST: ${DATABASE_HOST}
+      DATABASE_PORT: ${DATABASE_PORT}
+      DATABASE_NAME: ${DATABASE_NAME}
+      DATABASE_SSL: ${DATABASE_SSL}
+
+      STRAPI_TELEMETRY_DISABLED: false
+      STRAPI_DISABLE_UPDATE_NOTIFICATION: true
+
+      PORT: ${BACKEND_PORT}
+
+    stage:
+      ADMIN_ENABLED: false
+      CRON: false
+
+    release:
+      ADMIN_ENABLED: true
+      CRON: false
+
+  secrets:
+    all:
+      DATABASE_USERNAME: ${DATABASE_USERNAME}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+
+      AWS_S3_ACCESS_KEY_ID: ${AWS_S3_ACCESS_KEY_ID}
+      AWS_S3_ACCESS_SECRET: ${AWS_S3_ACCESS_SECRET}
+
+      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET}
+      APP_KEYS: ${APP_KEYS}
+      API_TOKEN_SALT: ${API_TOKEN_SALT}
+      JWT_SECRET: ${JWT_SECRET}
+
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY}
+      SENDGRID_REPLY_TO: ${SENDGRID_REPLY_TO}
+      SENDGRID_FROM: ${SENDGRID_FROM}

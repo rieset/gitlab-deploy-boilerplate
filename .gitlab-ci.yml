@@ -1,0 +1,81 @@
+image: node:18
+
+include:
+  - '/.gitlab/workflows/build.yml'
+  - '/.gitlab/workflows/deploy-to-kuber.yml'
+  - '/.gitlab/workflows/helm.yml'
+  - '/.gitlab/workflows/schedule.yml'
+
+stages:
+  - build
+  - hold
+  - deploy
+  - heating
+
+variables:
+  NAMESPACE: "marketing"
+
+  FRONTEND_PORT: 1338
+  FRONTEND_HOST: 0.0.0.0
+
+  BACKEND_PORT: 1337
+  BACKEND_HOST: 0.0.0.0
+
+Build Frontend:
+  stage: build
+  variables:
+    PREFIX: "frontend"
+  extends:
+    - .build-and-push
+
+Build Backend:
+  stage: build
+  variables:
+    PREFIX: "backend"
+  extends:
+    - .build-and-push
+
+Hold Release Frontend Image:
+  tags:
+    - docker
+  stage: hold
+  variables:
+    PREFIX: "frontend"
+  extends:
+    - .hold-release-image
+
+Hold Release Backend Image:
+  tags:
+    - docker
+  stage: hold
+  variables:
+    PREFIX: "backend"
+  extends:
+    - .hold-release-image
+
+Deploy to stage:
+  stage: deploy
+  extends:
+    - .auth-hetzner
+    - .stage
+
+Release:
+  stage: deploy
+  extends:
+    - .auth-aws
+    - .release
+
+Heating:
+  stage: heating
+  extends:
+    - .heating
+
+# Task for heating cache on schedule
+Scheduled heating:
+  stage: heating
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $CI_COMMIT_REF_SLUG == $CI_DEFAULT_BRANCH
+      when: always
+    - when: never
+  extends:
+    - .heating
